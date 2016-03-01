@@ -189,11 +189,22 @@ static double sinc(double x, long N)
 ////////////////////////////////////////////////////////////////////////////////
 #pragma mark
 ////////////////////////////////////////////////////////////////////////////////
-
+/*
+	NSBezierPathFromCR
+	------------------
+	Create an NSBezierPath using four sample points
+	
+	the x co-ordinates are set in one-third intervals to correspond with 
+	the regular spaced grid of sampling. This results in x(t) = t
+	
+	the y co-ordinates are set according to catmull-rom tangents, using 
+	"tension" factor "a". Because x is regular and constant, the tangents
+	are strictly catmull-rom for a = 1.0/3.0 only.
+*/
 static NSBezierPath *NSBezierPathFromCR(double a, double x, double *Y)
 {
-	double d1 = Y[2] - Y[0];
-	double d2 = Y[3] - Y[1];
+	double d1 = (Y[2] - Y[0]) / 2.0;
+	double d2 = (Y[3] - Y[1]) / 2.0;
 	
 	d1 *= a;
 	d2 *= a;
@@ -232,6 +243,12 @@ static NSBezierPath *NSBezierPathFromCR(double a, double x, double *Y)
 #pragma mark
 ////////////////////////////////////////////////////////////////////////////////
 /*
+	Bezier can be computed using a polynomial representation,
+	
+	note: while this has less multiplies than deCasteljau, modern architecture 
+	may not like the dependencies and create bubbles. 
+*/
+/*
 static double Bezier(double t, double P1, double C1, double C2, double P2)
 {
 	double d = P1;
@@ -241,7 +258,7 @@ static double Bezier(double t, double P1, double C1, double C2, double P2)
 
 	return ((a*t+b)*t+c)*t+d;
 }
-*/
+//*/
 ////////////////////////////////////////////////////////////////////////////////
 
 static double Bezier(double t, double P1, double C1, double C2, double P2)
@@ -263,8 +280,8 @@ static double Bezier(double t, double P1, double C1, double C2, double P2)
 static double CRCompute
 (double a, double x, double Y0, double Y1, double Y2, double Y3)
 {
-	double d1 = (Y2 - Y0) * a;
-	double d2 = (Y3 - Y1) * a;
+	double d1 = a * (Y2 - Y0) / 2.0;
+	double d2 = a * (Y3 - Y1) / 2.0;
 	return Bezier(x, Y1, Y1+d1, Y2-d2, Y2);
 }
 
