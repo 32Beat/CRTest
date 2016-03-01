@@ -1,5 +1,5 @@
 //
-//  main.m
+//  CRView.h
 //  CRTest
 //
 //  Created by 32BT on 26/02/16.
@@ -8,6 +8,6 @@
 
 #import <Cocoa/Cocoa.h>
 
-int main(int argc, const char * argv[]) {
-	return NSApplicationMain(argc, argv);
-}
+@interface CRView : NSView
+
+@end
