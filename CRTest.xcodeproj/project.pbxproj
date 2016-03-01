@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		7F8C2DAB1C85B13100B4DF50 /* CRView.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F8C2DA91C85B13100B4DF50 /* CRView.m */; };
+		7F8C2DAE1C85C57500B4DF50 /* view.png in Resources */ = {isa = PBXBuildFile; fileRef = 7F8C2DAD1C85C57500B4DF50 /* view.png */; };
 		7FA7084F1C85B0EB00006095 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 7FA7084E1C85B0EB00006095 /* AppDelegate.m */; };
 		7FA708521C85B0EB00006095 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 7FA708511C85B0EB00006095 /* main.m */; };
 		7FA708541C85B0EB00006095 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7FA708531C85B0EB00006095 /* Assets.xcassets */; };
@@ -17,6 +18,7 @@
 /* Begin PBXFileReference section */
 		7F8C2DA91C85B13100B4DF50 /* CRView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CRView.m; sourceTree = "<group>"; };
 		7F8C2DAA1C85B13100B4DF50 /* CRView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CRView.h; sourceTree = "<group>"; };
+		7F8C2DAD1C85C57500B4DF50 /* view.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = view.png; sourceTree = "<group>"; };
 		7FA7084A1C85B0EB00006095 /* CRTest.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CRTest.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7FA7084D1C85B0EB00006095 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		7FA7084E1C85B0EB00006095 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
@@ -37,6 +39,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		7F8C2DAC1C85C51D00B4DF50 /* artwork */ = {
+			isa = PBXGroup;
+			children = (
+				7F8C2DAD1C85C57500B4DF50 /* view.png */,
+			);
+			name = artwork;
+			sourceTree = "<group>";
+		};
 		7FA708411C85B0EB00006095 = {
 			isa = PBXGroup;
 			children = (
@@ -56,6 +66,7 @@
 		7FA7084C1C85B0EB00006095 /* CRTest */ = {
 			isa = PBXGroup;
 			children = (
+				7F8C2DAC1C85C51D00B4DF50 /* artwork */,
 				7F8C2DAA1C85B13100B4DF50 /* CRView.h */,
 				7F8C2DA91C85B13100B4DF50 /* CRView.m */,
 				7FA7084D1C85B0EB00006095 /* AppDelegate.h */,
@@ -135,6 +146,7 @@
 			files = (
 				7FA708541C85B0EB00006095 /* Assets.xcassets in Resources */,
 				7FA708571C85B0EB00006095 /* MainMenu.xib in Resources */,
+				7F8C2DAE1C85C57500B4DF50 /* view.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
