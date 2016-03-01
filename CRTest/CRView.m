@@ -60,6 +60,7 @@ static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 	
 	[self adjustOrigin];
 	
+	//----- draw grid
 	[HSB(0.0, 0.0, 0.9) set];
 	[self drawVerticalLineAt:-3.0];
 	[self drawVerticalLineAt:-2.0];
@@ -71,11 +72,12 @@ static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 	[HSB(0.0, 0.0, 0.75) set];
 	[self drawHorizontalLineAt:+1.0];
 	
+	//----- draw axis
 	[[NSColor blackColor] set];
 	[self drawHorizontalLineAt:0.0];
 	[self drawVerticalLineAt:0.0];
 
-	// draw elements
+	//----- draw curves
 	[[NSColor darkGrayColor] set];
 	[self drawSinc:2];
 	
@@ -96,7 +98,7 @@ static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 	[self drawDCR2];
 //*/
 	
-	// draw frame
+	//----- draw frame
 	[[NSColor blackColor] set];
 	NSFrameRect(self.bounds);
 }
@@ -243,13 +245,15 @@ static NSBezierPath *NSBezierPathFromCR(double a, double x, double *Y)
 #pragma mark
 ////////////////////////////////////////////////////////////////////////////////
 /*
-	Bezier can be computed using a polynomial representation,
+	BezierPN
+	--------
+	Compute Bezier value using polynomial coordinates
 	
-	note: while this has less multiplies than deCasteljau, modern architecture 
-	may not like the dependencies and create bubbles. 
+	note: while this has less multiplies than deCasteljau, modern architecture
+	may not like the dependencies and create bubbles.
 */
-/*
-static double Bezier(double t, double P1, double C1, double C2, double P2)
+
+double BezierPN(double t, double P1, double C1, double C2, double P2)
 {
 	double d = P1;
 	double c = 3*(C1-P1);
@@ -258,10 +262,15 @@ static double Bezier(double t, double P1, double C1, double C2, double P2)
 
 	return ((a*t+b)*t+c)*t+d;
 }
-//*/
-////////////////////////////////////////////////////////////////////////////////
 
-static double Bezier(double t, double P1, double C1, double C2, double P2)
+////////////////////////////////////////////////////////////////////////////////
+/*
+	BezierDC
+	--------
+	Compute Bezier value using de Casteljau algorithm
+*/
+
+double BezierDC(double t, double P1, double C1, double C2, double P2)
 {
 	P1 += t * (C1 - P1);
 	C1 += t * (C2 - C1);
@@ -275,6 +284,19 @@ static double Bezier(double t, double P1, double C1, double C2, double P2)
 	return P1;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+double Bezier(double t, double P1, double C1, double C2, double P2)
+{
+/*
+	return BezierPN(t, P1, C1, C2, P2);
+/*/
+	return BezierDC(t, P1, C1, C2, P2);
+//*/
+}
+
+////////////////////////////////////////////////////////////////////////////////
+#pragma mark
 ////////////////////////////////////////////////////////////////////////////////
 
 static double CRCompute
