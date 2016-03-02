@@ -7,6 +7,7 @@
 //
 
 #import "CRView.h"
+#import <Accelerate/Accelerate.h>
 
 @interface CRView ()
 {
@@ -29,15 +30,33 @@ static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 
 - (IBAction) didAdjustButton:(NSButton *)button
 {
-	double C = mButton.state;
-
+	int selectionIndex = [mButton.objectValue intValue];
+	
 	// switch between impulse and edge
+	SRC[0] = 0.0;
+	SRC[1] = 0.0;
+	SRC[2] = 0.0;
 	SRC[3] = 1.0;
-	SRC[4] = C;
-	SRC[5] = C;
-	SRC[6] = C;
-	SRC[7] = C;
+	SRC[4] = 0.0;
+	SRC[5] = 0.0;
+	SRC[6] = 0.0;
+	SRC[7] = 0.0;
 
+	if (selectionIndex == 1)
+	{
+		double V = 1.0;
+		SRC[4] = V;
+		SRC[5] = V;
+		SRC[6] = V;
+		SRC[7] = V;
+	}
+	else
+	if (selectionIndex == 2)
+	{
+		for (int n=0; n!=8; n++) \
+		{ SRC[n] = 1.0 * random()/RAND_MAX; }
+	}
+	
 	[self setNeedsDisplay:YES];
 }
 
@@ -72,10 +91,17 @@ static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 	[HSB(0.0, 0.0, 0.75) set];
 	[self drawHorizontalLineAt:+1.0];
 	
+	//----- draw samples for the "random" selection
+	if ([mButton.objectValue intValue] == 2)
+	{
+		[HSB(0.0, 0.4, 0.95) set];
+		[self drawSamples];
+	}
+	
 	//----- draw axis
 	[[NSColor blackColor] set];
-	[self drawHorizontalLineAt:0.0];
 	[self drawVerticalLineAt:0.0];
+	[self drawHorizontalLineAt:0.0];
 
 	//----- draw curves
 	[[NSColor darkGrayColor] set];
@@ -84,19 +110,12 @@ static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 	[[NSColor lightGrayColor] set];
 	[self drawSinc:3];
 	
-	[[NSColor blueColor] set];
-	[self drawCR1];
+	[[NSColor redColor] set];
+	[self drawLanczosInterpolation];
 
-/*
-	// CR2 should be equivalent to CR1
-	[[NSColor redColor] set];
-	[self drawDCR2];
-//*/
-/*
-	// DCR2 derivative of CR 
-	[[NSColor redColor] set];
-	[self drawDCR2];
-//*/
+	[[NSColor blueColor] set];
+//	[self drawCR1];
+	[self drawCR2];
 	
 	//----- draw frame
 	[[NSColor blackColor] set];
@@ -141,6 +160,24 @@ static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
+- (void) drawSamples
+{
+	NSBezierPath *path = [NSBezierPath new];
+	[path setLineWidth:3.0];
+	
+	for (long n=1; n!=6; n++)
+	{
+		[path moveToPoint:(NSPoint){ n-3.0, 0.0 }];
+		[path lineToPoint:(NSPoint){ n-3.0, SRC[n] }];
+		[self drawPath:path];
+		[path removeAllPoints];
+	}
+	
+	path = nil;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 - (void) drawPath:(NSBezierPath *)path
 {
 	NSRect B = self.bounds;
@@ -155,8 +192,10 @@ static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 #pragma mark
 ////////////////////////////////////////////////////////////////////////////////
 
-static double sinc(double x, long N)
+static double sinc(double x, double N)
 {
+	if (x == 0.0) return 1.0;
+	
 	double w = sin(x*M_PI/N)/(x*M_PI/N);
 	double s = sin(x*M_PI)/(x*M_PI);
 	return w * s;
@@ -172,17 +211,14 @@ static double sinc(double x, long N)
 	long R = 0.5 * self.bounds.size.width / 3.0;
 	for (long n=-R; n<=R; n++)
 	{
-		if (n != 0)
-		{
-			double x = 1.0 * N * n / R;
-			double y = sinc(x, N);
+		double x = 1.0 * N * n / R;
+		double y = sinc(x, N);
 /*
-			double y1 = sinc(x-0.0000001, N);
-			double y2 = sinc(x+0.0000001, N);
-			y = (y2-y1)/0.0000002;
+		double y1 = sinc(x-0.0000001, N);
+		double y2 = sinc(x+0.0000001, N);
+		y = (y2-y1)/0.0000002;
 //*/
-			[path lineToPoint:(NSPoint){ x, y }];
-		}
+		[path lineToPoint:(NSPoint){ x, y }];
 	}
 
 	[self drawPath:path];
@@ -242,35 +278,49 @@ static NSBezierPath *NSBezierPathFromCR(double a, double x, double *Y)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-#pragma mark
-////////////////////////////////////////////////////////////////////////////////
-/*
-	BezierPN
-	--------
-	Compute Bezier value using polynomial coordinates
-	
-	note: while this has less multiplies than deCasteljau, modern architecture
-	may not like the dependencies and create bubbles.
-*/
 
-double BezierPN(double t, double P1, double C1, double C2, double P2)
+- (void) drawNodes
 {
-	double d = P1;
-	double c = 3*(C1-P1);
-	double b = 3*(C2-C1) - c;
-	double a = (P2-P1) - b - c;
+	double a = mSlider.doubleValue;
 
-	return ((a*t+b)*t+c)*t+d;
+	static const double X[] = { -2.0, -1.0, 0.0, 1.0, 2.0 };
+	for (int n=0; n!=4; n++)
+	{
+		double Y0 = SRC[n+0];
+		double Y1 = SRC[n+1];
+		double Y2 = SRC[n+2];
+
+		double d = a * (Y2 - Y0) / 2.0;
+		
+		NSPoint P1 = { X[n]-1.0/3.0, Y1 - d };
+		NSPoint P2 = { X[n]+1.0/3.0, Y1 + d };
+		
+		NSBezierPath *path = [NSBezierPath new];
+		[path moveToPoint:P1];
+		[path lineToPoint:P2];
+		[self drawPath:path];
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+#pragma mark
+////////////////////////////////////////////////////////////////////////////////
 /*
-	BezierDC
-	--------
-	Compute Bezier value using de Casteljau algorithm
+	Bezier
+	------
+	Compute Bezier value using deCasteljau
+
+	polynomial version would be:
+	
+		double d = P1;
+		double c = 3*(C1-P1);
+		double b = 3*(C2-C1) - c;
+		double a = (P2-P1) - b - c;
+
+		return ((a*t+b)*t+c)*t+d;
 */
 
-double BezierDC(double t, double P1, double C1, double C2, double P2)
+double Bezier(double t, double P1, double C1, double C2, double P2)
 {
 	P1 += t * (C1 - P1);
 	C1 += t * (C2 - C1);
@@ -286,34 +336,20 @@ double BezierDC(double t, double P1, double C1, double C2, double P2)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-double Bezier(double t, double P1, double C1, double C2, double P2)
-{
-/*
-	return BezierPN(t, P1, C1, C2, P2);
-/*/
-	return BezierDC(t, P1, C1, C2, P2);
-//*/
-}
-
-////////////////////////////////////////////////////////////////////////////////
-#pragma mark
-////////////////////////////////////////////////////////////////////////////////
-
-static double CRCompute
-(double a, double x, double Y0, double Y1, double Y2, double Y3)
-{
-	double d1 = a * (Y2 - Y0) / 2.0;
-	double d2 = a * (Y3 - Y1) / 2.0;
-	return Bezier(x, Y1, Y1+d1, Y2-d2, Y2);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-static double CRComputePtr(double a, double x, double *Y)
+static double CRCompute(double a, double x, double *Y)
 {
 	Y += (int)x;
 	x -= trunc(x);
-	return CRCompute(a, x, Y[0], Y[1], Y[2], Y[3]);
+	
+	double Y0 = Y[0];
+	double Y1 = Y[1];
+	double Y2 = Y[2];
+	double Y3 = Y[3];
+	
+	double d1 = a * (Y2 - Y0) / 2.0;
+	double d2 = a * (Y3 - Y1) / 2.0;
+
+	return Bezier(x, Y1, Y1+d1, Y2-d2, Y2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -323,49 +359,82 @@ static double CRComputePtr(double a, double x, double *Y)
 	double a = mSlider.doubleValue;
 	
 	NSBezierPath *path = [NSBezierPath bezierPath];
-	[path moveToPoint:(NSPoint){ -2.0, 0.0 }];
-	
-	long R = 0.5 * self.bounds.size.width / 3.0;
-	for (long n=-R; n<=R; n++)
-	{
-		if (n != 0)
-		{
-			double x = 2.0 * n / R;
-			double y = CRComputePtr(a, x + 2.0, SRC);
 
-			[path lineToPoint:(NSPoint){ x, y }];
-		}
+	double x = 0.0;
+	double y = CRCompute(a, x, SRC);
+	[path moveToPoint:(NSPoint){ x-2.0, y }];
+	
+	long R = self.bounds.size.width / 3.0;
+	for (long n=1; n<=R; n++)
+	{
+		x = 4.0 * n / R;
+		y = CRCompute(a, x, SRC);
+		[path lineToPoint:(NSPoint){ x-2.0, y }];
 	}
 
 	[self drawPath:path];
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+#pragma mark
+////////////////////////////////////////////////////////////////////////////////
 
-- (void) drawDCR2
+static double interpolateWithKernel(double (*kernelFunction)(double, double), double a, double x, double *Y)
+{
+	Y += (int)x;
+	x -= trunc(x);
+
+	double W0 = kernelFunction(-1.0-x, a);
+	double W1 = kernelFunction(+0.0-x, a);
+	double W2 = kernelFunction(+1.0-x, a);
+	double W3 = kernelFunction(+2.0-x, a);
+	
+	double y =
+	W0 * Y[0] +
+	W1 * Y[1] +
+	W2 * Y[2] +
+	W3 * Y[3];
+	
+	return y / (W0 + W1 + W2 + W3);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+- (void) drawInterpolation:(double(*)(double, double))kernelFunction
 {
 	double a = mSlider.doubleValue;
-	
-	NSBezierPath *path = [NSBezierPath bezierPath];
-	[path moveToPoint:(NSPoint){ -2.0, 0.0 }];
-	
-	long R = 0.5 * self.bounds.size.width / 3.0;
-	for (long n=-R; n<=R; n++)
-	{
-		if (n != 0)
-		{
-			double x = 2.0 * n / R;
-			double x1 = x-0.00001;
-			double x2 = x+0.00001;
-			double y1 = CRComputePtr(a, x1 + 2.0, SRC);
-			double y2 = CRComputePtr(a, x2 + 2.0, SRC);
-			double y = (y2-y1)/(x2-x1);
+	[self drawInterpolation:kernelFunction withParameter:a];
+}
 
-			[path lineToPoint:(NSPoint){ x, y }];
-		}
+////////////////////////////////////////////////////////////////////////////////
+
+- (void) drawInterpolation:(double(*)(double, double))kernelFunction withParameter:(double)a
+{
+	NSBezierPath *path = [NSBezierPath bezierPath];
+	
+	double x = 0.0;
+	double y = interpolateWithKernel(kernelFunction, a, x, SRC);
+	
+	[path moveToPoint:(NSPoint){ x-2.0, y }];
+	
+	long R = self.bounds.size.width / 3.0;
+	for (long n=1; n<=R; n++)
+	{
+		x = 4.0 * n / R;
+		y = interpolateWithKernel(kernelFunction, a, x, SRC);
+
+		[path lineToPoint:(NSPoint){ x-2.0, y }];
 	}
 
 	[self drawPath:path];
+	
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+- (void) drawLanczosInterpolation
+{
+	[self drawInterpolation:sinc withParameter:2.0];
 }
 
 ////////////////////////////////////////////////////////////////////////////////
