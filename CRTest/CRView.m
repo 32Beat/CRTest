@@ -330,10 +330,10 @@ static NSBezierPath *NSBezierPathFromLM(double a, double x, double *Y)
 	x = floor(x);
 
 	// set segment endpoints P and control points C
-	NSPoint P1 = { x + (0.0/3.0), Y[0] };
-	NSPoint C1 = { x + (1.0/3.0), Y[0]+d1 };
-	NSPoint C2 = { x + (2.0/3.0), Y[1]-d2 };
-	NSPoint P2 = { x + (3.0/3.0), Y[1] };
+	NSPoint P1 = { x + (0.0/3.0), Y[1] };
+	NSPoint C1 = { x + (1.0/3.0), Y[1]+d1 };
+	NSPoint C2 = { x + (2.0/3.0), Y[2]-d2 };
+	NSPoint P2 = { x + (3.0/3.0), Y[2] };
 
 	// create corresponding path
 	NSBezierPath *path = [NSBezierPath new];
@@ -352,12 +352,12 @@ static NSBezierPath *NSBezierPathFromLM(double a, double x, double *Y)
 {
 	double a = mSlider.doubleValue;
 	
-	[self drawPath:NSBezierPathFromLM(a, -3.0, &SRC[1])];
-	[self drawPath:NSBezierPathFromLM(a, -2.0, &SRC[2])];
-	[self drawPath:NSBezierPathFromLM(a, -1.0, &SRC[3])];
-	[self drawPath:NSBezierPathFromLM(a, +0.0, &SRC[4])];
-	[self drawPath:NSBezierPathFromLM(a, +1.0, &SRC[5])];
-	[self drawPath:NSBezierPathFromLM(a, +2.0, &SRC[6])];
+	[self drawPath:NSBezierPathFromLM(a, -3.0, &SRC[0])];
+	[self drawPath:NSBezierPathFromLM(a, -2.0, &SRC[1])];
+	[self drawPath:NSBezierPathFromLM(a, -1.0, &SRC[2])];
+	[self drawPath:NSBezierPathFromLM(a, +0.0, &SRC[3])];
+	[self drawPath:NSBezierPathFromLM(a, +1.0, &SRC[4])];
+	[self drawPath:NSBezierPathFromLM(a, +2.0, &SRC[5])];
 }
 
 ////////////////////////////////////////////////////////////////////////////////
