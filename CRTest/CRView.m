@@ -18,11 +18,20 @@
 @end
 
 // convenience
+#define GRAPH_X_MIN 	(-3.5)
+#define GRAPH_X_MAX 	(+3.5)
+#define GRAPH_Y_MIN 	(-0.5)
+#define GRAPH_Y_MAX 	(+1.5)
+#define GRAPH_W 		(GRAPH_X_MAX - GRAPH_X_MIN)
+#define GRAPH_H 		(GRAPH_Y_MAX - GRAPH_Y_MIN)
+
 #define HSB(h, s, b) \
 [NSColor colorWithCalibratedHue:h/360.0 saturation:s brightness:b alpha:1.0]
 
+
+
 // impulse train
-static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
+static double SRC[] = { 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 
 ////////////////////////////////////////////////////////////////////////////////
 @implementation CRView
@@ -32,15 +41,16 @@ static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 {
 	int selectionIndex = [mButton.objectValue intValue];
 	
-	// switch between impulse and edge
+	// switch between impulse, edge, or random samples
 	SRC[0] = 0.0;
 	SRC[1] = 0.0;
 	SRC[2] = 0.0;
-	SRC[3] = 1.0;
-	SRC[4] = 0.0;
+	SRC[3] = 0.0;
+	SRC[4] = 1.0;
 	SRC[5] = 0.0;
 	SRC[6] = 0.0;
 	SRC[7] = 0.0;
+	SRC[8] = 0.0;
 
 	if (selectionIndex == 1)
 	{
@@ -49,12 +59,17 @@ static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 		SRC[5] = V;
 		SRC[6] = V;
 		SRC[7] = V;
+		SRC[8] = V;
 	}
 	else
 	if (selectionIndex == 2)
 	{
-		for (int n=0; n!=8; n++) \
+		for (int n=1; n!=8; n++) \
 		{ SRC[n] = 1.0 * random()/RAND_MAX; }
+		
+		// Replicate edge for interpolation
+		SRC[0] = SRC[1];
+		SRC[8] = SRC[7];
 	}
 	
 	[self setNeedsDisplay:YES];
@@ -81,14 +96,8 @@ static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 	
 	//----- draw grid
 	[HSB(0.0, 0.0, 0.9) set];
-	[self drawVerticalLineAt:-3.0];
-	[self drawVerticalLineAt:-2.0];
-	[self drawVerticalLineAt:-1.0];
-	[self drawVerticalLineAt:+1.0];
-	[self drawVerticalLineAt:+2.0];
-	[self drawVerticalLineAt:+3.0];
-	[self drawHorizontalLineAt:+0.5];
-	[HSB(0.0, 0.0, 0.75) set];
+	[self drawGrid];
+	[HSB(0.0, 0.0, 0.6) set];
 	[self drawHorizontalLineAt:+1.0];
 	
 	//----- draw samples for the "random" selection
@@ -113,9 +122,11 @@ static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 	[[NSColor redColor] set];
 	[self drawLanczosInterpolation];
 
+	[HSB(200.0, 0.5, 0.95) set];
+	[self drawLM1];
+
 	[[NSColor blueColor] set];
-//	[self drawCR1];
-	[self drawCR2];
+	[self drawCR1];
 	
 	//----- draw frame
 	[[NSColor blackColor] set];
@@ -136,10 +147,38 @@ static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
+- (void) drawGrid
+{
+	for (long n=-3; n!=4; n++)
+	{ [self drawVerticalLineAt:n]; }
+	[self drawHorizontalLineAt:+0.5];
+	[self drawHorizontalLineAt:+1.0];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+- (void) drawSamples
+{
+	NSBezierPath *path = [NSBezierPath new];
+	[path setLineWidth:3.0];
+	
+	for (long n=1; n!=8; n++)
+	{
+		[path moveToPoint:(NSPoint){ n-4.0, 0.0 }];
+		[path lineToPoint:(NSPoint){ n-4.0, SRC[n] }];
+		[self drawPath:path];
+		[path removeAllPoints];
+	}
+	
+	path = nil;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 - (void) drawHorizontalLineAt:(CGFloat)y
 {
 	NSRect B = self.bounds;
-	y = round(y*B.size.height/2.0);
+	y = round(y*B.size.height/GRAPH_H);
 	
 	NSPoint X1 = { NSMinX(B), y };
 	NSPoint X2 = { NSMaxX(B), y };
@@ -151,29 +190,11 @@ static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 - (void) drawVerticalLineAt:(CGFloat)x
 {
 	NSRect B = self.bounds;
-	x = round(x*B.size.width/6.0);
+	x = round(x*B.size.width/GRAPH_W);
 
 	NSPoint Y1 = { x, NSMinY(B) };
 	NSPoint Y2 = { x, NSMaxY(B) };
 	[NSBezierPath strokeLineFromPoint:Y1 toPoint:Y2];
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-- (void) drawSamples
-{
-	NSBezierPath *path = [NSBezierPath new];
-	[path setLineWidth:3.0];
-	
-	for (long n=1; n!=6; n++)
-	{
-		[path moveToPoint:(NSPoint){ n-3.0, 0.0 }];
-		[path lineToPoint:(NSPoint){ n-3.0, SRC[n] }];
-		[self drawPath:path];
-		[path removeAllPoints];
-	}
-	
-	path = nil;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -183,7 +204,7 @@ static double SRC[] = { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 	NSRect B = self.bounds;
 	
 	NSAffineTransform *T = [NSAffineTransform transform];
-	[T scaleXBy:B.size.width / 6.0 yBy:B.size.height / 2.0];
+	[T scaleXBy:B.size.width / GRAPH_W yBy:B.size.height / GRAPH_H];
 	
 	[[T transformBezierPath:path] stroke];
 }
@@ -230,37 +251,41 @@ static double sinc(double x, double N)
 /*
 	NSBezierPathFromCR
 	------------------
-	Create an NSBezierPath using four sample points
+	Create an interpolating NSBezierPath for the segment x+1.0 to x+2.0,
+	using four sample points at { x+0.0, x+1.0, x+2.0, x+3.0 }
 	
-	the x co-ordinates are set in one-third intervals to correspond with 
-	the regular spaced grid of sampling. This results in x(t) = t
+	the resulting x co-ordinates are set in one-third intervals to correspond 
+	with the regular spaced grid of sampling. This results in x(t) = t
 	
 	the y co-ordinates are set according to catmull-rom tangents, using 
 	"tension" factor "a". Because x is regular and constant, the tangents
 	are strictly catmull-rom for a = 1.0/3.0 only.
 */
+////////////////////////////////////////////////////////////////////////////////
+
 static NSBezierPath *NSBezierPathFromCR(double a, double x, double *Y)
 {
-	double d1 = (Y[2] - Y[0]) / 2.0;
-	double d2 = (Y[3] - Y[1]) / 2.0;
-	
-	d1 *= a;
-	d2 *= a;
-	
-	double P1 = Y[1];
-	double C1 = Y[1] + d1;
-	double C2 = Y[2] - d2;
-	double P2 = Y[2];
+	// compute tangent for x + 1.0 using neighboring samples
+	double d1 = a * (Y[2] - Y[0]) / 2.0;
+	// compute tangent for x + 2.0 using neighboring samples
+	double d2 = a * (Y[3] - Y[1]) / 2.0;
 
+	// ensure segment starts at integral offset
 	x = floor(x);
+	
+	// set segment endpoints P and control points C
+	NSPoint P1 = { x + (0.0/3.0), Y[1] };
+	NSPoint C1 = { x + (1.0/3.0), Y[1]+d1 };
+	NSPoint C2 = { x + (2.0/3.0), Y[2]-d2 };
+	NSPoint P2 = { x + (3.0/3.0), Y[2] };
 
+	// create corresponding path
 	NSBezierPath *path = [NSBezierPath new];
 	
-	[path moveToPoint:(NSPoint){ x+(0.0/3.0), P1 }];
-	
-	[path curveToPoint:(NSPoint){ x+(3.0/3.0), P2 }
-		 controlPoint1:(NSPoint){ x+(1.0/3.0), C1 }
-		 controlPoint2:(NSPoint){ x+(2.0/3.0), C2 }];
+	[path moveToPoint:P1];
+	[path curveToPoint:P2
+		 controlPoint1:C1
+		 controlPoint2:C2];
 	
 	return path;
 }
@@ -271,35 +296,68 @@ static NSBezierPath *NSBezierPathFromCR(double a, double x, double *Y)
 {
 	double a = mSlider.doubleValue;
 	
-	[self drawPath:NSBezierPathFromCR(a, -2.0, &SRC[0])];
-	[self drawPath:NSBezierPathFromCR(a, -1.0, &SRC[1])];
-	[self drawPath:NSBezierPathFromCR(a, +0.0, &SRC[2])];
-	[self drawPath:NSBezierPathFromCR(a, +1.0, &SRC[3])];
+	[self drawPath:NSBezierPathFromCR(a, -3.0, &SRC[0])];
+	[self drawPath:NSBezierPathFromCR(a, -2.0, &SRC[1])];
+	[self drawPath:NSBezierPathFromCR(a, -1.0, &SRC[2])];
+	[self drawPath:NSBezierPathFromCR(a, +0.0, &SRC[3])];
+	[self drawPath:NSBezierPathFromCR(a, +1.0, &SRC[4])];
+	[self drawPath:NSBezierPathFromCR(a, +2.0, &SRC[5])];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+#pragma mark
+////////////////////////////////////////////////////////////////////////////////
+/*
+	Local monotone interpolation (no overshoot, useful for interaction purposes)
+*/
+static NSBezierPath *NSBezierPathFromLM(double a, double x, double *Y)
+{
+	double d1 = (Y[1] - Y[0]);
+	double d2 = (Y[2] - Y[1]);
+	double d3 = (Y[3] - Y[2]);
+	
+	if ((d1 < 0.0)==(d2 < 0.0))
+	{ d1 = a * (fabs(d1)<fabs(d2)?d1:d2); }
+	else
+	{ d1 = 0.0; }
+	
+	if ((d2 < 0.0)==(d3 < 0.0))
+	{ d2 = a * (fabs(d2)<fabs(d3)?d2:d3); }
+	else
+	{ d2 = 0.0; }
+	
+
+	x = floor(x);
+
+	// set segment endpoints P and control points C
+	NSPoint P1 = { x + (0.0/3.0), Y[0] };
+	NSPoint C1 = { x + (1.0/3.0), Y[0]+d1 };
+	NSPoint C2 = { x + (2.0/3.0), Y[1]-d2 };
+	NSPoint P2 = { x + (3.0/3.0), Y[1] };
+
+	// create corresponding path
+	NSBezierPath *path = [NSBezierPath new];
+	
+	[path moveToPoint:P1];
+	[path curveToPoint:P2
+		 controlPoint1:C1
+		 controlPoint2:C2];
+	
+	return path;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-- (void) drawNodes
+- (void) drawLM1
 {
 	double a = mSlider.doubleValue;
-
-	static const double X[] = { -2.0, -1.0, 0.0, 1.0, 2.0 };
-	for (int n=0; n!=4; n++)
-	{
-		double Y0 = SRC[n+0];
-		double Y1 = SRC[n+1];
-		double Y2 = SRC[n+2];
-
-		double d = a * (Y2 - Y0) / 2.0;
-		
-		NSPoint P1 = { X[n]-1.0/3.0, Y1 - d };
-		NSPoint P2 = { X[n]+1.0/3.0, Y1 + d };
-		
-		NSBezierPath *path = [NSBezierPath new];
-		[path moveToPoint:P1];
-		[path lineToPoint:P2];
-		[self drawPath:path];
-	}
+	
+	[self drawPath:NSBezierPathFromLM(a, -3.0, &SRC[1])];
+	[self drawPath:NSBezierPathFromLM(a, -2.0, &SRC[2])];
+	[self drawPath:NSBezierPathFromLM(a, -1.0, &SRC[3])];
+	[self drawPath:NSBezierPathFromLM(a, +0.0, &SRC[4])];
+	[self drawPath:NSBezierPathFromLM(a, +1.0, &SRC[5])];
+	[self drawPath:NSBezierPathFromLM(a, +2.0, &SRC[6])];
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -376,6 +434,31 @@ static double CRCompute(double a, double x, double *Y)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+- (void) drawNodes
+{
+	double a = mSlider.doubleValue;
+
+	static const double X[] = { -2.0, -1.0, 0.0, 1.0, 2.0 };
+	for (int n=0; n!=4; n++)
+	{
+		double Y0 = SRC[n+0];
+		double Y1 = SRC[n+1];
+		double Y2 = SRC[n+2];
+
+		double d = a * (Y2 - Y0) / 2.0;
+		
+		NSPoint P1 = { X[n]-1.0/3.0, Y1 - d };
+		NSPoint P2 = { X[n]+1.0/3.0, Y1 + d };
+		
+		NSBezierPath *path = [NSBezierPath new];
+		[path moveToPoint:P1];
+		[path lineToPoint:P2];
+		[self drawPath:path];
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
 #pragma mark
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -415,15 +498,15 @@ static double interpolateWithKernel(double (*kernelFunction)(double, double), do
 	double x = 0.0;
 	double y = interpolateWithKernel(kernelFunction, a, x, SRC);
 	
-	[path moveToPoint:(NSPoint){ x-2.0, y }];
+	[path moveToPoint:(NSPoint){ x-3.0, y }];
 	
 	long R = self.bounds.size.width / 3.0;
 	for (long n=1; n<=R; n++)
 	{
-		x = 4.0 * n / R;
+		x = 6.0 * n / R;
 		y = interpolateWithKernel(kernelFunction, a, x, SRC);
 
-		[path lineToPoint:(NSPoint){ x-2.0, y }];
+		[path lineToPoint:(NSPoint){ x-3.0, y }];
 	}
 
 	[self drawPath:path];
@@ -435,6 +518,37 @@ static double interpolateWithKernel(double (*kernelFunction)(double, double), do
 - (void) drawLanczosInterpolation
 {
 	[self drawInterpolation:sinc withParameter:2.0];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+#pragma mark
+////////////////////////////////////////////////////////////////////////////////
+
+static double BezierKernel(double x, double a)
+{
+	a *= 0.5;
+
+	x = fabs(x);
+
+	if (x < 1.0)
+	{
+		return Bezier(x, 1.0, 1.0, +a, 0.0);
+	}
+	else
+	if (x < 2.0)
+	{
+		x -= 1.0;
+		return Bezier(x, 0.0, -a, 0.0, 0.0);
+	}
+	
+	return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+- (void) drawBezierKernelInterpolation
+{
+	[self drawInterpolation:BezierKernel];
 }
 
 ////////////////////////////////////////////////////////////////////////////////
