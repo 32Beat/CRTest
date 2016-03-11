@@ -117,16 +117,17 @@ static double SRC[] = { 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 	[self drawSinc:2];
 	
 	[[NSColor lightGrayColor] set];
-	[self drawSinc:3];
-	
+	[self drawSinc:0];
+
 	[[NSColor redColor] set];
 	[self drawLanczosInterpolation];
 
-	[HSB(200.0, 0.5, 0.95) set];
-	[self drawLM1];
-
 	[[NSColor blueColor] set];
-	[self drawCR1];
+	[self drawCurveType:1];
+/*
+	[[NSColor redColor] set];
+	[self drawTestKernelInterpolation];
+*/
 	
 	//----- draw frame
 	[[NSColor blackColor] set];
@@ -212,33 +213,40 @@ static double SRC[] = { 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 };
 ////////////////////////////////////////////////////////////////////////////////
 #pragma mark
 ////////////////////////////////////////////////////////////////////////////////
-
+/*
+	sinc
+	----
+	for N == 0 returns unwindowed sinc,
+	for N != 0 returns corresponding Lanczos windowed sinc
+*/
 static double sinc(double x, double N)
 {
 	if (x == 0.0) return 1.0;
 	
-	double w = sin(x*M_PI/N)/(x*M_PI/N);
 	double s = sin(x*M_PI)/(x*M_PI);
-	return w * s;
+	
+	if (N != 0.0)
+	{ s *= sin(x*M_PI/N)/(x*M_PI/N); }
+	
+	return s;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-- (void) drawSinc:(long)N
+- (void) drawSinc:(unsigned int)N
 {
+	double m = N != 0.0 ? N : 3.0;
+
 	NSBezierPath *path = [NSBezierPath bezierPath];
-	[path moveToPoint:(NSPoint){ -N, 0.0 }];
+	[path moveToPoint:(NSPoint){ -m, 0.0 }];
+	
 	
 	long R = 0.5 * self.bounds.size.width / 3.0;
 	for (long n=-R; n<=R; n++)
 	{
-		double x = 1.0 * N * n / R;
+		double x = m * n / R;
 		double y = sinc(x, N);
-/*
-		double y1 = sinc(x-0.0000001, N);
-		double y2 = sinc(x+0.0000001, N);
-		y = (y2-y1)/0.0000002;
-//*/
+
 		[path lineToPoint:(NSPoint){ x, y }];
 	}
 
@@ -247,6 +255,52 @@ static double sinc(double x, double N)
 
 ////////////////////////////////////////////////////////////////////////////////
 #pragma mark
+////////////////////////////////////////////////////////////////////////////////
+// TODO: adjustable between fabs(d1) and fabs(d2) ?
+static double tangentWithType(int type, double Y0, double Y1, double Y2)
+{
+	double d1 = Y1-Y0;
+	double d2 = Y2-Y1;
+	
+	if (type == 1)
+		return (d1||d2)? (fabs(d1)*d1+fabs(d2)*d2)/(fabs(d1)+fabs(d2)):0.0;
+
+	if (type == 2)
+		return (d1||d2)? (fabs(d2)*d1+fabs(d1)*d2)/(fabs(d1)+fabs(d2)):0.0;
+
+	// local monotone
+	if (type == 3)
+		return ((d1 < 0.0)==(d2 < 0.0))?
+		(fabs(d1)<fabs(d2)?d1:d2) : 0.0;
+
+	// default to (Y2 - Y0) / 2.0
+	return 0.5 * (d1+d2);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+static NSBezierPath *NSBezierPathWithTangents(double x, double Y1, double d1, double d2, double Y2)
+{
+	// ensure segment starts at integral offset
+	x = floor(x);
+	
+	// set segment endpoints P and control points C
+	NSPoint P1 = { x + (0.0/3.0), Y1 };
+	NSPoint C1 = { x + (1.0/3.0), Y1+d1 };
+	NSPoint C2 = { x + (2.0/3.0), Y2-d2 };
+	NSPoint P2 = { x + (3.0/3.0), Y2 };
+
+	// create corresponding path
+	NSBezierPath *path = [NSBezierPath new];
+	
+	[path moveToPoint:P1];
+	[path curveToPoint:P2
+		 controlPoint1:C1
+		 controlPoint2:C2];
+	
+	return path;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 /*
 	NSBezierPathFromCR
@@ -263,101 +317,26 @@ static double sinc(double x, double N)
 */
 ////////////////////////////////////////////////////////////////////////////////
 
-static NSBezierPath *NSBezierPathFromCR(double a, double x, double *Y)
+static NSBezierPath *NSBezierPathWithCurveType(int type, double a, double x, double *Y)
 {
-	// compute tangent for x + 1.0 using neighboring samples
-	double d1 = a * (Y[2] - Y[0]) / 2.0;
-	// compute tangent for x + 2.0 using neighboring samples
-	double d2 = a * (Y[3] - Y[1]) / 2.0;
+	double d1 = a * tangentWithType(type, Y[0], Y[1], Y[2]);
+	double d2 = a * tangentWithType(type, Y[1], Y[2], Y[3]);
 
-	// ensure segment starts at integral offset
-	x = floor(x);
-	
-	// set segment endpoints P and control points C
-	NSPoint P1 = { x + (0.0/3.0), Y[1] };
-	NSPoint C1 = { x + (1.0/3.0), Y[1]+d1 };
-	NSPoint C2 = { x + (2.0/3.0), Y[2]-d2 };
-	NSPoint P2 = { x + (3.0/3.0), Y[2] };
-
-	// create corresponding path
-	NSBezierPath *path = [NSBezierPath new];
-	
-	[path moveToPoint:P1];
-	[path curveToPoint:P2
-		 controlPoint1:C1
-		 controlPoint2:C2];
-	
-	return path;
+	return NSBezierPathWithTangents(x+1.0, Y[1], d1, d2, Y[2]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-- (void) drawCR1
+- (void) drawCurveType:(int)type
 {
 	double a = mSlider.doubleValue;
 	
-	[self drawPath:NSBezierPathFromCR(a, -3.0, &SRC[0])];
-	[self drawPath:NSBezierPathFromCR(a, -2.0, &SRC[1])];
-	[self drawPath:NSBezierPathFromCR(a, -1.0, &SRC[2])];
-	[self drawPath:NSBezierPathFromCR(a, +0.0, &SRC[3])];
-	[self drawPath:NSBezierPathFromCR(a, +1.0, &SRC[4])];
-	[self drawPath:NSBezierPathFromCR(a, +2.0, &SRC[5])];
-}
-
-////////////////////////////////////////////////////////////////////////////////
-#pragma mark
-////////////////////////////////////////////////////////////////////////////////
-/*
-	Local monotone interpolation (no overshoot, useful for interaction purposes)
-*/
-static NSBezierPath *NSBezierPathFromLM(double a, double x, double *Y)
-{
-	double d1 = (Y[1] - Y[0]);
-	double d2 = (Y[2] - Y[1]);
-	double d3 = (Y[3] - Y[2]);
-	
-	if ((d1 < 0.0)==(d2 < 0.0))
-	{ d1 = a * (fabs(d1)<fabs(d2)?d1:d2); }
-	else
-	{ d1 = 0.0; }
-	
-	if ((d2 < 0.0)==(d3 < 0.0))
-	{ d2 = a * (fabs(d2)<fabs(d3)?d2:d3); }
-	else
-	{ d2 = 0.0; }
-	
-
-	x = floor(x);
-
-	// set segment endpoints P and control points C
-	NSPoint P1 = { x + (0.0/3.0), Y[1] };
-	NSPoint C1 = { x + (1.0/3.0), Y[1]+d1 };
-	NSPoint C2 = { x + (2.0/3.0), Y[2]-d2 };
-	NSPoint P2 = { x + (3.0/3.0), Y[2] };
-
-	// create corresponding path
-	NSBezierPath *path = [NSBezierPath new];
-	
-	[path moveToPoint:P1];
-	[path curveToPoint:P2
-		 controlPoint1:C1
-		 controlPoint2:C2];
-	
-	return path;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-- (void) drawLM1
-{
-	double a = mSlider.doubleValue;
-	
-	[self drawPath:NSBezierPathFromLM(a, -3.0, &SRC[0])];
-	[self drawPath:NSBezierPathFromLM(a, -2.0, &SRC[1])];
-	[self drawPath:NSBezierPathFromLM(a, -1.0, &SRC[2])];
-	[self drawPath:NSBezierPathFromLM(a, +0.0, &SRC[3])];
-	[self drawPath:NSBezierPathFromLM(a, +1.0, &SRC[4])];
-	[self drawPath:NSBezierPathFromLM(a, +2.0, &SRC[5])];
+	[self drawPath:NSBezierPathWithCurveType(type, a, -4.0, &SRC[0])];
+	[self drawPath:NSBezierPathWithCurveType(type, a, -3.0, &SRC[1])];
+	[self drawPath:NSBezierPathWithCurveType(type, a, -2.0, &SRC[2])];
+	[self drawPath:NSBezierPathWithCurveType(type, a, -1.0, &SRC[3])];
+	[self drawPath:NSBezierPathWithCurveType(type, a, +0.0, &SRC[4])];
+	[self drawPath:NSBezierPathWithCurveType(type, a, +1.0, &SRC[5])];
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -376,6 +355,15 @@ static NSBezierPath *NSBezierPathFromLM(double a, double x, double *Y)
 		double a = (P2-P1) - b - c;
 
 		return ((a*t+b)*t+c)*t+d;
+		
+		
+	from polynomial to Bezier:
+	
+		double P1 = d;
+		double C1 = P1 + c/3;
+		double C2 = C1 + (b+c)/3;
+		double P2 = a + b + c + d;
+ 
 */
 
 double Bezier(double t, double P1, double C1, double C2, double P2)
@@ -478,7 +466,7 @@ static double interpolateWithKernel(double (*kernelFunction)(double, double), do
 	W2 * Y[2] +
 	W3 * Y[3];
 	
-	return y / (W0 + W1 + W2 + W3);
+	return y;// / (W0 + W1 + W2 + W3);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -549,6 +537,39 @@ static double BezierKernel(double x, double a)
 - (void) drawBezierKernelInterpolation
 {
 	[self drawInterpolation:BezierKernel];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+#pragma mark
+////////////////////////////////////////////////////////////////////////////////
+
+static double TestKernel(double x, double a)
+{
+	a *= 0.5;
+
+	x = fabs(x);
+
+	if (x < 1.0)
+	{
+//		double w = Bezier(x, 1.0, 1, 1-a, 1.0);
+		return sinc(x, 0.0);
+	}
+	else
+	if (x < 2.0)
+	{
+		x -= 1.0;
+//		double w = Bezier(x, 1.0, 1, 1-a, 1.0);
+		return (1-x) - sinc(x, 0.0);
+	}
+	
+	return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+- (void) drawTestKernelInterpolation
+{
+	[self drawInterpolation:TestKernel];
 }
 
 ////////////////////////////////////////////////////////////////////////////////
